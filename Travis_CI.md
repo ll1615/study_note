@@ -11,12 +11,12 @@
 - 登录之后 Travis CI 会同步你 Github 上的仓库, 进入你的[管理页面](https://travis-ci.org/profile), 确认 Travis CI 构建你 fork 的仓库 "travis-broken-example".
 - travis.yaml 示例
 ``` yaml
-language: php
-php:
-- 5.5
-- 5.4
-- hhvm
-script: phpunit Test.php
+  language: php
+  php:
+  - 5.5
+  - 5.4
+  - hhvm
+  script: phpunit Test.php
 ```
 > 说明: 这个文件告诉 Travis CI "该项目使用 PHP 语言书写, 使用 PHP 版本5.5|5.4|HHVM, 执行脚本命令 'phpunit Test.php' 进行单元测试".
 
