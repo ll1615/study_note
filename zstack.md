@@ -123,3 +123,65 @@
   ZStack 使用 Pyhon 代理来管理 KVM 主机。为了解决大量的设备的安装、升级的难题，ZStack 无缝且透明的整合了 配置管理软件Ansible。通过 Ansible，所有的 ZStack 代理都能自动化的部署、配置和升级。
 
   所有的 ZStack 代理都包含了3个文件：一个 Python 包(xxx.tar.gz)，一个 init.d 服务文件，一个 Ansible YAML 配置文件。
+
+# 存储和网络
+
+- L2和 L3网络：
+
+  ZStack 把网络模型抽象成 L2 和 L3。L2网络提供了一种 L2 隔离方法,而一个 L3 网络基本上代表了一个与OSI 模型4~7层网络服务相关的子网。ZStack 的整个网络模型就是这样的。
+  ![网络架构](http://zstack.org/images/blogs/scalability/network-model1.png)
+
+  L2网络代表了一个真正的L2广播域，它是整个网络的基础。L2网络之上的是 L3网络和网络服务提供者；L3网络是与服务相关联的子网；可以有多个 L3网络工作在同一个 L2网络之下只要它们的 IP 范围没有冲突。一个 L3网络可能拥有多个属于同一子网的 IP，拥有独立的 IP 域是为了允许用户可以保留子网的 IP。
+
+  绑定策略：它允许一个 L2网络从主机分组的集群中绑定/解绑定。
+
+- 虚拟路由网络服务提供者
+
+  在 ZStack 的网络模型中，OSI 模型中的4~7层网络服务来自不同服务提供者的小插件来实现。默认的提供者叫做虚拟路由提供者，使用一个自定义个 Linux VM 作为一个虚拟装置，它可以提供诸如 DHCP、DNS、SNAT、EIP 和每个 L3网络的端口转发。使用虚拟路由器的虚拟机的优势没有单一故障点,对基础设施没有特殊要求,这样用户可以在基础的硬件上实现各种网络服务而无需购买昂贵的设备。
+
+  ZStack 选择使用 NVF 作为实现网络服务的方案。主要考虑如下：<br/>
+    1.最小的基础设备需求。用户不必为了迎合 IaaS 软件的网络模型而改变现有的或计划的基础设施<br/>
+    2.无单点故障点。<br/>
+    3.无状态。遇到未预见的错误时，IaaS 软件可以轻松的销毁的重新创建网络节点<br/>
+    4.高可用性。可以部署两个以主从模式使用 Virtual Router Redundancy 协议来工作的虚拟路由来实现高可用。<br/>
+    5.Hypervisor 无关的。不依赖 hypervisor 且无缝集成常见的 hypervisor，如 KVM、Xen、VMWare 和 Hyper-V。<br/>
+    6.合理的性能。
+
+- 主存储和备份存储
+
+  存储系统根据它的逻辑功能被分成了两种类型，主存储和备份存储。
+
+  主存储以存储虚拟机的卷的存储池的形式工作，它能被运行中的虚拟机访问。这种类型的存储可以是基于文件系统的（把卷存储为文件），也可以是基于块存储的（它的卷的块设备）。它可以是网络共享的存储类型，如 NFS、ISCSI；也可以是本地存储设备，如物理主机的硬盘。
+  ![Primary Storage](http://zstack.org/images/blogs/scalability/storage1.png)
+  ![Local Storage](http://zstack.org/images/blogs/scalability/storage2.png)
+
+  备份存储作为存放包含操作系统的镜像模板、备份卷和快照的仓库。可以基于文件系统，以文件的形式存储；也可以基于对象形式存储。
+  ![Backup Storage](http://zstack.org/images/blogs/scalability/storage3.png)
+
+# 测试
+
+- 集成测试
+
+  集成测试是基于使用模拟器的 JUnit 来构建的。测试用例存放于 ZStack 的 Java 源代码里，开发者可以很容易是使用常规的 JUnit 命令开始测试套件。
+
+- 系统测试
+
+  系统测试是一个叫做 zstack-woodpecker 的独立的 Python 项目，它以 ZStack 的 API 为基础进行构建，可以在真实的、复杂的硬件环境下进行所有的测试，覆盖了函数测试、压力测试和性能测试。
+
+  zstack-woodpecker由3部分构成：<br/>
+  1.测试框架：管理所有测试用例,并提供必要的库,工具。<br/>
+  2.环境部署工具：可以根据 XML 配置文件来部署环境。<br/>
+  3.模块化的测试用例。
+  ![zstack-woodpecker](http://zstack.org/images/blogs/testing/test-framework.png)
+
+- 基于模型的测试
+
+  它基于 Model-based Testing，是 zstack-woodpecker 的一个子项目。系统中的测试用例会持续执行随机行为的 API 直到预定义的条件满足或者找到缺陷。作为机器驱动的测试，它能克服人类思维逻辑的缺点来测试那些符合人类逻辑而不是 API 正确的，帮助发现人类不易注意到的边界测试用例。
+
+  工作流：当系统启动时，它根据动作选择策略从一个模块到另一个模块执行动作，每个模块都结束之后，检查器会验证测试结果然后测试出口条件，如果测试失败或出口条件被满足系统则退出，否则它将继续重复测试。
+  ![test flow](http://zstack.org/images/blogs/testing/model-based-test.png)
+
+  动作选择策略有3中：<br/>
+  1.随机调度程序，简单的随机选择下一个操作，可以设置每个操作的选择权重。<br/>
+  2.公平调度程序，每个候选操作都有相等的权重。<br/>
+  3.路径覆盖调度程序，它可以根据历史数据来选择下一个操作，形式新的操作路径。
