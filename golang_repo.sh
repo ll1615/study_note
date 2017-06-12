@@ -16,7 +16,7 @@ do
     fi
 
     # move directory
-    dst="$GOPATH/src/golang.org/x/${pkg}"
+    dst="$GOPATH/src/golang.org/x/"
     # mkdir before moving
     mkdir -p ${dst}
 
