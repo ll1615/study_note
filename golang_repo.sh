@@ -1,11 +1,23 @@
 #!/bin/sh
 
+# check if golang has been installed
+if ! command -v go >/dev/null; then
+    echo 'Please install golang first'
+fi
+
+# check if $GOPATH has been set
+if [ -z ${GOPATH+x} ]
+then
+    echo 'Please set $GOPATH first'
+    exit 1
+fi
+
 # packages to be downloaded
 PKGS=('net' 'tools' 'lint' 'text' 'sys' 'crypto')
 
 for pkg in ${PKGS[@]}
 do
-    if ! test -d ${pkg}
+    if ! test -d ${pkg} 
     then
         repo="https://github.com/golang/${pkg}.git"
 
@@ -15,13 +27,18 @@ do
         echo "\n"
     fi
 
-    # move directory
+    # copy to destination directory
     dst="$GOPATH/src/golang.org/x/"
-    # mkdir before moving
-    mkdir -p ${dst}
 
-    echo "moving repo to ${dst}"
-    mv -f ${pkg} ${dst}
+    if ! test -d ${dst}${pkg}
+    then
+        # mkdir before copying
+        mkdir -p ${dst}
 
-    echo "\n"
+        echo "copying repo to ${dst}${pkg} ..."
+        cp -R ${pkg} ${dst}
+
+        echo "\n"
+    fi
 done
+
